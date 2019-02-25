@@ -1,0 +1,14 @@
+CARACTERÍSTICAS 
+---------------
+
+[] - declaración de variables
+[] - asignación de valores
+[] - bloque if
+[] - bloque for
+[] - bloque while
+[] - condiciones or
+[] - condiciones and
+[] - tabla de símbolos
+[] - manejo de errores
+[] - manejo de salida por consola
+[] - generación de código intermedio
