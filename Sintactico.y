@@ -4,10 +4,21 @@
     #include <string.h>
 	#include "y.tab.h"
 
+	// definiciones tabla de símbolos
+	// --------------------------------------------------------
+	extern const char TS_COLUMNAS[][100];
+
+	// definiciones declaraciones
+	// --------------------------------------------------------
+	// TODO: mostrar en pantalla ids y tipos declarados, hacer lo de "tabs global"
+	extern struct cola_t declaracion_ids;
+	extern struct cola_t declaracion_tipos;
+
 	// funciones tabla de símbolos
 	// --------------------------------------------------------
 	extern bool ts_inicializar();
 	extern void ts_guardar();
+	extern bool ts_insertar_valor_buscando(const char * col_busqueda, const char * val_busqueda, const char * columna, const char * valor);
 
 	// funciones de Flex y Bison
 	// --------------------------------------------------------
@@ -30,7 +41,7 @@
 %token PARENTESIS_ABRE PARENTESIS_CIERRA
 %token CORCHETE_ABRE CORCHETE_CIERRA
 %token ID
-%token REAL ENTERO
+%token REAL ENTERO CADENA
 %token DIM AS COMA
 
 %%
@@ -66,17 +77,22 @@ lista_definiciones:
 
 definicion_id: 
 	ID {
-		// TODO: validar ID repetido
+		// TODO: validar ID repetido (cantidad de apariciones menor a 2)
+		printf("ID [%s]\n", yytext);
 	}
 	;
 
 tipo_id:
 	REAL tipo
 	| ENTERO tipo
+	| CADENA tipo
 	;
 
 tipo: {
-		
+		// TODO: agregar el tipo de dato a la ts
+		// buscar el ID en la columna "0" e insertar el TIPO en la columna "1"
+		// ts_insertar_valor_buscando(TS_COLUMNAS[0], "a", TS_COLUMNAS[1], yytext);
+		printf("TIPO [%s]\n", yytext);
 	}
 	;
 
