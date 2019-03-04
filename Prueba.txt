@@ -1,2 +1,2 @@
-DIM [ a, b ] AS [ real, real ]
-DIM [ c ] AS [ real ]
+DIM [ a, b, c ] AS [ real, entero, real ]
+DIM [ d ] AS [ real ]

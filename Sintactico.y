@@ -1,11 +1,28 @@
 %{
 	#include <stdio.h>
     #include <stdbool.h>
+    #include <string.h>
 	#include "y.tab.h"
 
-	int yyerror();
+	// funciones tabla de símbolos
+	// --------------------------------------------------------
+	extern bool ts_inicializar();
+	extern void ts_guardar();
+
+	// funciones de Flex y Bison
+	// --------------------------------------------------------
+	extern void yyerror(const char *s);
 	extern int yylex(void);
+
+	// variables de Flex y Bison
+	// --------------------------------------------------------
+	extern char * yytext;
     FILE *yyin;
+
+	// funciones auxiliares
+	// --------------------------------------------------------
+	void tabs(int cant_tabs);
+
 %}
 
 %locations
@@ -13,7 +30,7 @@
 %token PARENTESIS_ABRE PARENTESIS_CIERRA
 %token CORCHETE_ABRE CORCHETE_CIERRA
 %token ID
-%token REAL
+%token REAL ENTERO
 %token DIM AS COMA
 
 %%
@@ -25,8 +42,12 @@ programa:
 	}
 	;
 
-declaraciones: 
-	lista_declaraciones
+declaraciones: {
+		printf("declaraciones-comienza\n");
+	}
+	lista_declaraciones {
+		printf("declaraciones-finaliza\n");
+	}
 	;
 
 lista_declaraciones:
@@ -39,36 +60,56 @@ declaracion:
 	;
 
 lista_definiciones:
-	ID CORCHETE_CIERRA AS CORCHETE_ABRE tipo_id
-	| ID COMA lista_definiciones COMA tipo_id
+	definicion_id CORCHETE_CIERRA AS CORCHETE_ABRE tipo_id
+	| definicion_id COMA lista_definiciones COMA tipo_id
+	;
+
+definicion_id: 
+	ID {
+		// TODO: validar ID repetido
+	}
 	;
 
 tipo_id:
-	REAL
+	REAL tipo
+	| ENTERO tipo
+	;
+
+tipo: {
+		
+	}
 	;
 
 %%
 
-void tabs(int cant_tabs) {
-    int i;
-    for(i = 0; i < cant_tabs; i++) {
-        printf("\t");
-    }
-}
-
 int main(int argc, char *argv[]) {
 	printf("\n");
 	printf("========================================================\n");
-	printf("inicio-analisis\n");
+	printf("analisis-comienza\n");
 	printf("========================================================\n");
     if ((yyin = fopen(argv[1], "rt")) == NULL) {
 		printf("ERROR: abriendo archivo [%s]\n", argv[1]);
 	} else {
-		yyparse();
+		if(ts_inicializar() == true) {
+			yyparse();
+			fclose(yyin);
+			ts_guardar();
+		}
 	}
-	fclose(yyin);
 	printf("========================================================\n");
-	printf("fin-analisis\n");
+	printf("analisis-finaliza\n");
 	printf("========================================================\n");
 	return 0;
+}
+
+// auxiliares
+// --------------------------------------------------------
+
+void tabs(int cant_tabs) {
+    int i;
+    for(i = 0; i < cant_tabs; i++) {
+		// manejamos tabs como espacios para que se vea igual 
+		// en todos los tipos de pantallas y configuraciones
+        printf(" ");
+    }
 }
