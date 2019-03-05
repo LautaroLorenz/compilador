@@ -4,13 +4,13 @@
     #include <string.h>
 	#include "y.tab.h"
 
-	// definiciones tabla de símbolos
+	// definiciones declaraciones
 	// --------------------------------------------------------
-	extern const char TS_COLUMNAS[][100];
+	// relación cuantos id se declaran por cada tipo
+	#define CANTIDAD_IDS_POR_TIPO (1)
 
 	// definiciones declaraciones
 	// --------------------------------------------------------
-	// TODO: mostrar en pantalla ids y tipos declarados, hacer lo de "tabs global"
 	extern struct cola_t declaracion_ids;
 	extern struct cola_t declaracion_tipos;
 
@@ -18,11 +18,17 @@
 	// --------------------------------------------------------
 	extern bool ts_inicializar();
 	extern void ts_guardar();
-	extern bool ts_insertar_valor_buscando(const char * col_busqueda, const char * val_busqueda, const char * columna, const char * valor);
+
+	// funciones declaraciones
+	// --------------------------------------------------------
+	extern void dec_inicializar();
+	extern void dec_insertar(struct cola_t *p_cola, const char *descripcion);
+	extern void dec_guardar_imprimir(const int cant_ids_por_tipo);
+	extern int dec_buscar_id(const char * id);
 
 	// funciones de Flex y Bison
 	// --------------------------------------------------------
-	extern void yyerror(const char *s);
+	extern void yyerror(const char *mensaje);
 	extern int yylex(void);
 
 	// variables de Flex y Bison
@@ -30,10 +36,10 @@
 	extern char * yytext;
     FILE *yyin;
 
-	// funciones auxiliares
+	// variables auxiliares
 	// --------------------------------------------------------
-	void tabs(int cant_tabs);
-
+	extern unsigned int tab_nivel;
+	extern char error_mensaje[1000];
 %}
 
 %locations
@@ -55,8 +61,12 @@ programa:
 
 declaraciones: {
 		printf("declaraciones-comienza\n");
+		dec_inicializar();
 	}
 	lista_declaraciones {
+		tab_nivel++;
+		dec_guardar_imprimir(CANTIDAD_IDS_POR_TIPO);
+		tab_nivel--;
 		printf("declaraciones-finaliza\n");
 	}
 	;
@@ -77,8 +87,14 @@ lista_definiciones:
 
 definicion_id: 
 	ID {
-		// TODO: validar ID repetido (cantidad de apariciones menor a 2)
-		printf("ID [%s]\n", yytext);
+		// si el id aún no fue declarado
+		if(dec_buscar_id(yytext) == 0) {
+			// id declarado
+			dec_insertar(&declaracion_ids, yytext);
+		} else {
+			sprintf(error_mensaje, "el ID [%s] ya fue declarado previamente", yytext);
+			yyerror(error_mensaje);
+		}
 	}
 	;
 
@@ -89,10 +105,8 @@ tipo_id:
 	;
 
 tipo: {
-		// TODO: agregar el tipo de dato a la ts
-		// buscar el ID en la columna "0" e insertar el TIPO en la columna "1"
-		// ts_insertar_valor_buscando(TS_COLUMNAS[0], "a", TS_COLUMNAS[1], yytext);
-		printf("TIPO [%s]\n", yytext);
+		// tipo de dato para "CANTIDAD_IDS_POR_TIPO" ids declarados
+		dec_insertar(&declaracion_tipos, yytext);
 	}
 	;
 
@@ -100,9 +114,9 @@ tipo: {
 
 int main(int argc, char *argv[]) {
 	printf("\n");
-	printf("========================================================\n");
+	printf("==============================================================\n");
 	printf("analisis-comienza\n");
-	printf("========================================================\n");
+	printf("==============================================================\n");
     if ((yyin = fopen(argv[1], "rt")) == NULL) {
 		printf("ERROR: abriendo archivo [%s]\n", argv[1]);
 	} else {
@@ -112,20 +126,8 @@ int main(int argc, char *argv[]) {
 			ts_guardar();
 		}
 	}
-	printf("========================================================\n");
+	printf("==============================================================\n");
 	printf("analisis-finaliza\n");
-	printf("========================================================\n");
+	printf("==============================================================\n");
 	return 0;
-}
-
-// auxiliares
-// --------------------------------------------------------
-
-void tabs(int cant_tabs) {
-    int i;
-    for(i = 0; i < cant_tabs; i++) {
-		// manejamos tabs como espacios para que se vea igual 
-		// en todos los tipos de pantallas y configuraciones
-        printf(" ");
-    }
 }

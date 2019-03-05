@@ -7,6 +7,10 @@
 
 	// definiciones tabla de símbolos
 	// --------------------------------------------------------
+	#define COL_NOMBRE ("NOMBRE")
+	#define COL_TIPO_DE_DATO ("TIPO DE DATO")
+	#define COL_VALOR ("VALOR")
+	#define COL_LONGITUD ("LONGITUD")
 	#define TAM_COL_NOMBRE (24)
 	#define TAM_COL_TIPO_DE_DATO (20)
 	#define TAM_COL_VALOR (20)
@@ -14,7 +18,15 @@
 
 	// estructuras pila
 	// --------------------------------------------------------
-	// TODO:
+	typedef struct pila_nodo {
+		void* elemento;
+		struct pila_nodo *siguiente;
+	} pila_nodo_t;
+
+	typedef struct pila {
+		pila_nodo_t *tope;
+		int tam_elemento;
+	} pila_t;
 
 	// estructuras cola
 	// --------------------------------------------------------
@@ -23,7 +35,7 @@
 		struct cola_nodo *siguiente;
 	} cola_nodo_t;
 
-	typedef struct {
+	typedef struct cola {
 		cola_nodo_t *primero, *ultimo;
 		int tam_elemento;
 	} cola_t;
@@ -41,7 +53,7 @@
 		struct lista_nodo *siguiente;
 	} lista_nodo_t;
 
-	typedef struct {
+	typedef struct lista {
 		lista_nodo_t *primero, *actual;
 		int tam_elemento;
 	} lista_t;
@@ -55,7 +67,28 @@
 		char longitud[TAM_COL_LONGITUD];
 	} ts_registro_t;
 
+	// estructuras declaraciones
+	// --------------------------------------------------------
+	typedef struct dec_registro {
+		char descripcion[100];
+	} dec_registro_t;
+
+	// declaraciones
+	// --------------------------------------------------------
+	cola_t declaracion_ids;
+	cola_t declaracion_tipos;
+
+	// tabla de símbolos
+	// --------------------------------------------------------	
 	lista_t tabla_de_simbolos;
+
+	// funciones pila
+	// --------------------------------------------------------
+	void pila_crear(pila_t *p_pila, int tam_elemento);
+	void pila_vaciar(pila_t *p_pila);
+	bool pila_vacia(pila_t pila);
+	bool pila_agregar(pila_t *p_pila, void *p_elemento);
+	bool pila_sacar(pila_t *p_pila, void *p_elemento);
 
 	// funciones cola
 	// --------------------------------------------------------
@@ -82,6 +115,7 @@
 	void ts_imprimir_titulos(FILE * f_ts);
 	void ts_imprimir_separador(FILE * f_ts, char separador);
 	void ts_guardar();
+	void ts_error(const char *mensaje);
 	void ts_registro_inicializar(ts_registro_t *registro);
 	// insertar un valor en alguna columna de las que figuran en TS_COLUMNAS
 	void ts_insertar_valor_en_columna(const char * columna, const char * valor);
@@ -90,13 +124,31 @@
 	// retorna false si no pudo encontrar una coincidencia con "val_busqueda"
 	bool ts_insertar_valor_buscando(const char * col_busqueda, const char * val_busqueda, const char * columna, const char * valor);
 
+	// funciones declaraciones
+	// --------------------------------------------------------
+	void dec_inicializar();
+	void dec_insertar(cola_t *p_cola, const char *descripcion);
+	void dec_guardar_imprimir(const int cant_ids_por_tipo);
+	// retorna la cantidad de veces que un id fue declarado
+	int dec_buscar_id(const char * id);
+
+	// funciones auxiliares
+	// --------------------------------------------------------
+	void tabs(int cant_tabs);
+	void yyerror(const char *mensaje);
+
+	// variables auxiliares
+	// --------------------------------------------------------
+	unsigned int tab_nivel = 0;
+	char error_mensaje[1000];
+
 	// constantes tabla de símbolos
 	// --------------------------------------------------------	
 	const char TS_COLUMNAS[][100] = {
-		"NOMBRE",
-		"TIPO DE DATO",
-		"VALOR",
-		"LONGITUD"
+		COL_NOMBRE,
+		COL_TIPO_DE_DATO,
+		COL_VALOR,
+		COL_LONGITUD
 	};
 	const int TS_TAMS_COLUMNA[] = {
 		TAM_COL_NOMBRE,
@@ -135,7 +187,7 @@ ID {LETRA}({LETRA}|{DIGITO}|_)*
 	return CADENA;
 }
 {ID} {
-	ts_insertar_valor_en_columna(TS_COLUMNAS[0], yytext);
+	ts_insertar_valor_en_columna(COL_NOMBRE, yytext);
 	return ID;
 }
 "(" {
@@ -154,14 +206,76 @@ ID {LETRA}({LETRA}|{DIGITO}|_)*
 	/* ignorar espaciado */ 
 }
 . {
-	printf("ERROR: linea [%d], no se reconoce [%s]\n", yylineno, yytext);
-	exit(1);
+	sprintf(error_mensaje, "no se esperaba encontrar la expresion [%s]", yytext);
+	yyerror(error_mensaje);
 }
 
 %%
 
-void yyerror(const char *s) {
-	printf("ERROR: linea [%d], [%s]\n", yylineno, s);
+void yyerror(const char *mensaje) {
+	char error[1001];
+	sprintf(error, "\n\n>>>> FIN INESPERADO <<<<\nERROR: en la linea [%d] de su programa, %s\n", yylineno, mensaje);
+	printf(error);
+	ts_error(error);
+	exit(1);
+}
+
+// auxiliares
+// --------------------------------------------------------
+
+void tabs(int cant_tabs) {
+    int i;
+    for(i = 0; i < cant_tabs * 4; i++) {
+		// manejamos tabs como espacios para que se vea igual 
+		// en todos los tipos de pantallas y configuraciones
+        printf(" ");
+    }
+}
+
+// pila
+// --------------------------------------------------------
+
+void pila_crear(pila_t *p_pila, int tam_elemento) {
+	p_pila->tope = NULL;
+	p_pila->tam_elemento = tam_elemento;
+}
+
+void pila_vaciar(pila_t *p_pila) {
+	pila_nodo_t *p_aux = p_pila->tope;
+	pila_nodo_t *p_sig;
+	while (p_aux) {
+		p_sig = p_aux->siguiente;
+		free(p_aux->elemento);
+		free(p_aux);
+		p_aux = p_sig;
+	}
+	p_pila->tope = NULL;
+}
+
+bool pila_vacia(pila_t pila) {
+	return (pila.tope == NULL);
+}
+
+bool pila_agregar(pila_t *p_pila, void *p_elemento) {
+	pila_nodo_t *p_nodo = (pila_nodo_t*) malloc(sizeof(pila_nodo_t));
+	if (!p_nodo)
+		return false;
+	else {
+		p_nodo->siguiente = p_pila->tope;
+		p_pila->tope = p_nodo;
+		p_nodo->elemento = malloc (p_pila->tam_elemento);
+		memcpy(p_nodo->elemento, p_elemento, p_pila->tam_elemento);
+		return true;
+	}
+}
+
+bool pila_sacar(pila_t *p_pila, void *p_elemento) {
+	pila_nodo_t *p_aux = p_pila->tope;
+	p_pila->tope = p_pila->tope->siguiente;
+	memcpy(p_elemento, p_aux->elemento, p_pila->tam_elemento);
+	free(p_aux->elemento);
+	free(p_aux);
+	return true;
 }
 
 // cola
@@ -311,7 +425,7 @@ bool lista_insertar(lista_t *p_lista, lista_movimiento_t movimiento, void *p_ele
 	memcpy(p_nodo->elemento, p_elemento, p_lista->tam_elemento);
 	p_lista->actual=p_nodo;
 	return true;
-} 
+}
 
 // tabla de símbolos
 // --------------------------------------------------------
@@ -394,6 +508,16 @@ bool ts_inicializar() {
 	fclose(f_ts);
 	lista_crear(&tabla_de_simbolos, sizeof(ts_registro_t));
 	return true;
+}
+
+void ts_registro_inicializar(ts_registro_t *registro) {
+	int i, offset_bytes;
+	int ts_cantidad_columnas = sizeof(TS_TAMS_COLUMNA)/sizeof(int);
+	char * p_registro = (char *)registro;	
+	for(i = 0, offset_bytes = 0; i < ts_cantidad_columnas; i++) {
+		*(p_registro + offset_bytes) = '\0';
+		offset_bytes += TS_TAMS_COLUMNA[i];
+	}
 }
 
 void ts_insertar_valor_en_columna(const char * columna, const char * valor) {	
@@ -499,12 +623,58 @@ void ts_guardar() {
 	free(f_ts);
 }
 
-void ts_registro_inicializar(ts_registro_t *registro) {
-	int i, offset_bytes;
-	int ts_cantidad_columnas = sizeof(TS_TAMS_COLUMNA)/sizeof(int);
-	char * p_registro = (char *)registro;	
-	for(i = 0, offset_bytes = 0; i < ts_cantidad_columnas; i++) {
-		*(p_registro + offset_bytes) = '\0';
-		offset_bytes += TS_TAMS_COLUMNA[i];
+void ts_error(const char *mensaje) {
+	FILE * f_ts;
+	ts_guardar();	
+	f_ts = fopen("tabla_de_simbolos.txt", "a+");
+	fprintf(f_ts, mensaje);
+	free(f_ts);
+}
+
+// declaraciones
+// --------------------------------------------------------
+
+void dec_inicializar() {
+	cola_crear(&declaracion_ids, sizeof(dec_registro_t));
+	cola_crear(&declaracion_tipos, sizeof(dec_registro_t));
+}
+
+void dec_insertar(cola_t *p_cola, const char *descripcion) {
+	dec_registro_t registro;
+	strcpy(registro.descripcion, descripcion);
+	cola_agregar(p_cola, &registro);
+}
+
+void dec_guardar_imprimir(const int cant_ids_por_tipo) {
+	int i;
+	dec_registro_t reg_id;
+	dec_registro_t reg_tipo;
+	while(!cola_vacia(declaracion_tipos)) {
+		cola_sacar(&declaracion_tipos, &reg_tipo);
+		for(i = 0; i < cant_ids_por_tipo; i++) {
+			cola_sacar(&declaracion_ids, &reg_id);
+			tabs(tab_nivel);
+			printf("ID [%s] TIPO [%s]\n", reg_id.descripcion, reg_tipo.descripcion);
+			ts_insertar_valor_buscando(COL_NOMBRE, reg_id.descripcion, COL_TIPO_DE_DATO, reg_tipo.descripcion);			
+		}
 	}
+}
+
+int dec_buscar_id(const char * id) {
+	int apariciones = 0;
+	dec_registro_t reg_id;
+	cola_t cola_aux;
+	cola_crear(&cola_aux, sizeof(dec_registro_t));
+	while(!cola_vacia(declaracion_ids)) {
+		cola_sacar(&declaracion_ids, &reg_id);
+		if(strcmp(reg_id.descripcion, id) == 0)
+			apariciones++;
+		cola_agregar(&cola_aux, &reg_id);
+	}
+	while(!cola_vacia(cola_aux)) {
+		cola_sacar(&cola_aux, &reg_id);
+		cola_agregar(&declaracion_ids, &reg_id);
+	}
+
+	return apariciones;
 }
