@@ -31,6 +31,10 @@
 	extern void yyerror(const char *mensaje);
 	extern int yylex(void);
 
+	// funciones auxiliares
+	// --------------------------------------------------------
+	extern void consola_log(const char * log_msj);
+
 	// variables de Flex y Bison
 	// --------------------------------------------------------
 	extern char * yytext;
@@ -40,6 +44,7 @@
 	// --------------------------------------------------------
 	extern unsigned int tab_nivel;
 	extern char error_mensaje[1000];
+	extern char log_mensaje[1000];
 %}
 
 %locations
@@ -48,32 +53,37 @@
 %token CORCHETE_ABRE CORCHETE_CIERRA
 %token ID
 %token REAL ENTERO CADENA
+%token CONSTANTE_REAL
 %token DIM AS COMA
+%token OPERADOR_ASIGNACION
 
 %%
 
 programa:
-	declaraciones
+	declaraciones sentencias
 	| {
-		printf("programa vacio\n");
+		consola_log("programa vacio");
 	}
 	;
 
 declaraciones: {
-		printf("declaraciones-comienza\n");
+		consola_log("declaraciones-comienza");
+		tab_nivel++;
 		dec_inicializar();
 	}
 	lista_declaraciones {
-		tab_nivel++;
 		dec_guardar_imprimir(CANTIDAD_IDS_POR_TIPO);
 		tab_nivel--;
-		printf("declaraciones-finaliza\n");
+		consola_log("declaraciones-finaliza");
 	}
 	;
 
 lista_declaraciones:
 	lista_declaraciones declaracion
 	| declaracion
+	| {
+		consola_log("programa sin declaraciones");
+	}
 	;
 
 declaracion:
@@ -110,6 +120,45 @@ tipo: {
 	}
 	;
 
+sentencias: {
+		consola_log("setencias-comienza");
+		tab_nivel++;
+	} 
+	lista_sentencias {
+		tab_nivel--;
+		consola_log("setencias-finaliza");
+	}
+	;
+
+lista_sentencias:
+	lista_sentencias setencia
+	| setencia
+	| {
+		consola_log("programa sin sentencias");
+		
+	}
+	;
+
+setencia:
+	asignacion 
+	;
+
+asignacion:
+	id_declarado {
+		printf("ID [%s]\n", yytext);
+	} OPERADOR_ASIGNACION id_declarado
+	;
+
+id_declarado: 
+	ID {
+		// validar que el id esté declarado
+		if(dec_buscar_id(yytext) == 0) {
+			sprintf(error_mensaje, "el ID [%s] no se puede utilizar porque no fue declarado", yytext);
+			yyerror(error_mensaje);
+		}
+	}
+	;
+	
 %%
 
 int main(int argc, char *argv[]) {

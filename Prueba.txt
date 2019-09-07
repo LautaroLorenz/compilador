@@ -1,2 +1,4 @@
 DIM [ a, b, c ] AS [ real, entero, cadena ]
 DIM [ d ] AS [ real ]
+
+a = b

@@ -11,10 +11,10 @@
 	#define COL_TIPO_DE_DATO ("TIPO DE DATO")
 	#define COL_VALOR ("VALOR")
 	#define COL_LONGITUD ("LONGITUD")
-	#define TAM_COL_NOMBRE (24)
+	#define TAM_COL_NOMBRE (20)
 	#define TAM_COL_TIPO_DE_DATO (20)
 	#define TAM_COL_VALOR (20)
-	#define TAM_COL_LONGITUD (18)
+	#define TAM_COL_LONGITUD (20)
 
 	// estructuras pila
 	// --------------------------------------------------------
@@ -117,12 +117,13 @@
 	void ts_guardar();
 	void ts_error(const char *mensaje);
 	void ts_registro_inicializar(ts_registro_t *registro);
+	void ts_insertar_registro(ts_registro_t *registro);
 	// insertar un valor en alguna columna de las que figuran en TS_COLUMNAS
 	void ts_insertar_valor_en_columna(const char * columna, const char * valor);
 	// busca el valor "val_busqueda" en la columna "col_busqueda",
 	// luego inserta el valor "valor" en la columna "columna".
 	// retorna false si no pudo encontrar una coincidencia con "val_busqueda"
-	bool ts_insertar_valor_buscando(const char * col_busqueda, const char * val_busqueda, const char * columna, const char * valor);
+	void ts_insertar_valor_buscando(const char * col_busqueda, const char * val_busqueda, const char * columna, const char * valor);
 
 	// funciones declaraciones
 	// --------------------------------------------------------
@@ -134,13 +135,19 @@
 
 	// funciones auxiliares
 	// --------------------------------------------------------
-	void tabs(int cant_tabs);
+	void tabs();
+	void consola_log(const char * log_msj);
 	void yyerror(const char *mensaje);
+	// agrega un guión bajo al principio de la cadena
+	char *guionizar(const char * cadena);
 
 	// variables auxiliares
 	// --------------------------------------------------------
 	unsigned int tab_nivel = 0;
 	char error_mensaje[1000];
+	char log_mensaje[1000];
+	// contiene la última cadena que fue guionizada
+	char guionizada[1000];
 
 	// constantes tabla de símbolos
 	// --------------------------------------------------------	
@@ -165,6 +172,7 @@
 DIGITO ([0-9])+
 LETRA [a-zA-Z]
 ID {LETRA}({LETRA}|{DIGITO}|_)*
+CONSTANTE_REAL (({DIGITO})+("."{1})({DIGITO})*)|(({DIGITO})*("."{1})({DIGITO})+)
 
 %%
 
@@ -186,9 +194,21 @@ ID {LETRA}({LETRA}|{DIGITO}|_)*
 "cadena" {
 	return CADENA;
 }
+"=" {
+	return OPERADOR_ASIGNACION;
+}
 {ID} {
 	ts_insertar_valor_en_columna(COL_NOMBRE, yytext);
 	return ID;
+}
+{CONSTANTE_REAL} {
+	ts_registro_t registro;
+	ts_registro_inicializar(&registro);
+	strcpy(registro.nombre, guionizar(yytext));
+	strcpy(registro.tipo_de_dato, "constante_real");
+	strcpy(registro.valor, yytext);
+	ts_insertar_registro(&registro);
+	return CONSTANTE_REAL;
 }
 "(" {
 	return PARENTESIS_ABRE;
@@ -214,7 +234,12 @@ ID {LETRA}({LETRA}|{DIGITO}|_)*
 
 void yyerror(const char *mensaje) {
 	char error[1001];
-	sprintf(error, "\n\n>>>> FIN INESPERADO <<<<\nERROR: en la linea [%d] de su programa, %s\n", yylineno, mensaje);
+	char aux_msj[1000];
+	if(strcmp(mensaje, "syntax error") == 0)
+		strcpy(aux_msj, "sintaxis incorrecta");
+	else 
+		strcpy(aux_msj, mensaje);
+	sprintf(error, "\n\n>>>> FIN INESPERADO: linea [%d] del programa <<<<\nERROR: %s\n", yylineno, aux_msj);
 	printf(error);
 	ts_error(error);
 	exit(1);
@@ -223,13 +248,23 @@ void yyerror(const char *mensaje) {
 // auxiliares
 // --------------------------------------------------------
 
-void tabs(int cant_tabs) {
+void tabs() {
     int i;
-    for(i = 0; i < cant_tabs * 4; i++) {
+    for(i = 0; i < tab_nivel * 4; i++) {
 		// manejamos tabs como espacios para que se vea igual 
 		// en todos los tipos de pantallas y configuraciones
         printf(" ");
     }
+}
+
+void consola_log(const char * log_msj) {
+	tabs();
+	printf("%s\n", log_msj);
+};
+
+char *guionizar(const char * cadena) {
+	sprintf(guionizada, "_%s", cadena);
+	return guionizada;
 }
 
 // pila
@@ -520,11 +555,16 @@ void ts_registro_inicializar(ts_registro_t *registro) {
 	}
 }
 
+void ts_insertar_registro(ts_registro_t *registro) {
+	lista_insertar(&tabla_de_simbolos, LS_SIGUIENTE, registro);
+}
+
 void ts_insertar_valor_en_columna(const char * columna, const char * valor) {	
 	int i, offset_bytes;
 	int ts_cantidad_columnas = sizeof(TS_TAMS_COLUMNA)/sizeof(int);	
-	ts_registro_t registro;
+	ts_registro_t registro, aux_registro;
 	char * p_registro = (char *)&registro;
+	bool valor_encontrado = false;
 	ts_registro_inicializar(&registro);
 	for(i = 0, offset_bytes = 0; i < ts_cantidad_columnas; i++) {
 		if(strcmp(columna, TS_COLUMNAS[i]) == 0) {
@@ -533,10 +573,25 @@ void ts_insertar_valor_en_columna(const char * columna, const char * valor) {
 		}		
 		offset_bytes += TS_TAMS_COLUMNA[i];
 	}
-	lista_insertar(&tabla_de_simbolos, LS_SIGUIENTE, &registro);
+
+	// si el valor ya existe no hace falta insertar de nuevo
+	// TODO: continuar desde acá
+	if(lista_mover_actual(&tabla_de_simbolos, LS_PRIMERO)) {
+		//	do {
+		lista_elemento_actual(tabla_de_simbolos, &aux_registro);
+		// 		// si encontramos la fila buscada
+		// 		if(strcmp((p_registro + offset_bytes), valor) == 0) {
+		// 			valor_encontrado = true;
+		// 			break;
+		// 		}
+		//	} while(lista_mover_actual(&tabla_de_simbolos, LS_SIGUIENTE));
+	}
+	// si el valor no existia, lo agregamos a la columna
+	if(valor_encontrado == false)
+		lista_insertar(&tabla_de_simbolos, LS_SIGUIENTE, &registro);
 }
 
-bool ts_insertar_valor_buscando(const char * col_busqueda, const char * val_busqueda, const char * columna, const char * valor) {
+void ts_insertar_valor_buscando(const char * col_busqueda, const char * val_busqueda, const char * columna, const char * valor) {
 	int i;
 	// offset en bytes del registro al valor buscado
 	int offset_bytes_buscar;
@@ -574,7 +629,10 @@ bool ts_insertar_valor_buscando(const char * col_busqueda, const char * val_busq
 		} while(lista_mover_actual(&tabla_de_simbolos, LS_SIGUIENTE));
 	}
 
-	return valor_encontrado;
+	if(valor_encontrado == false) {
+		sprintf(error_mensaje, "buscando [%s]==[%s] en la tabla de simbolos, 0 coincidencias", col_busqueda, val_busqueda);
+		yyerror(error_mensaje);
+	}
 }
 
 void ts_guardar() {
@@ -649,14 +707,22 @@ void dec_guardar_imprimir(const int cant_ids_por_tipo) {
 	int i;
 	dec_registro_t reg_id;
 	dec_registro_t reg_tipo;
+	// para no perder las declaraciones de ids
+	cola_t cola_aux;
+	cola_crear(&cola_aux, sizeof(dec_registro_t));
 	while(!cola_vacia(declaracion_tipos)) {
 		cola_sacar(&declaracion_tipos, &reg_tipo);
 		for(i = 0; i < cant_ids_por_tipo; i++) {
 			cola_sacar(&declaracion_ids, &reg_id);
-			tabs(tab_nivel);
-			printf("ID [%s] TIPO [%s]\n", reg_id.descripcion, reg_tipo.descripcion);
+			sprintf(log_mensaje, "ID [%s] TIPO [%s]", reg_id.descripcion, reg_tipo.descripcion);
+			consola_log(log_mensaje);
 			ts_insertar_valor_buscando(COL_NOMBRE, reg_id.descripcion, COL_TIPO_DE_DATO, reg_tipo.descripcion);			
+			cola_agregar(&cola_aux, &reg_id);
 		}
+	}
+	while(!cola_vacia(cola_aux)) {
+		cola_sacar(&cola_aux, &reg_id);
+		cola_agregar(&declaracion_ids, &reg_id);
 	}
 }
 
